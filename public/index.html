@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Verification</title>
+    <!-- Cloudflare Turnstile Explict API Script -->
+    <script src="https://cloudflare.com" async defer></script>
+    <style>
+        :root {
+            --bg-color: #f8f9fa;
+            --card-bg: #ffffff;
+            --text-main: #212529;
+            --text-muted: #6c757d;
+            --border-color: #dee2e6;
+            --primary: #0d6efd;
+            --primary-hover: #0b5ed7;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .card {
+            background: var(--card-bg);
+            padding: 2.5rem;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+            border: 1px solid var(--border-color);
+            max-width: 380px;
+            width: 100%;
+            box-sizing: border-box;
+            text-align: center;
+        }
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 0 0 0.5rem 0;
+        }
+        p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin: 0 0 2rem 0;
+            line-height: 1.4;
+        }
+        .turnstile-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 1.5rem;
+            min-height: 65px; /* Prevents layout shifting when widget loads */
+        }
+        button {
+            width: 100%;
+            padding: 0.8rem;
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: #fff;
+            background-color: var(--primary);
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+        }
+        button:hover { background-color: var(--primary-hover); }
+        button:disabled { background-color: var(--border-color); cursor: not-allowed; }
+        #status-message {
+            margin-top: 1.2rem;
+            font-size: 0.85rem;
+            font-weight: 500;
+            min-height: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h1>Security Check</h1>
+        <p>Please click the checkbox below to complete verification and access the system.</p>
+        
+        <form id="verificationForm">
+            <!-- Container where Turnstile will explicitly render -->
+            <div class="turnstile-container">
+                <div id="my-turnstile-widget"></div>
+            </div>
+            
+            <button type="submit" id="submitBtn" disabled>Verify & Continue</button>
+        </form>
+        
+        <div id="status-message" role="alert"></div>
+    </div>
+
+    <script>
+        let userToken = "";
+        const submitBtn = document.getElementById('submitBtn');
+        const statusMsg = document.getElementById('status-message');
+
+        // Helper to cleanly injection dynamically runtime settings
+        function displayMessage(text, color) {
+            statusMsg.innerText = text;
+            statusMsg.style.color = color;
+        }
+
+        // Fetch the public site key dynamically from the backend configuration
+        async function initTurnstile() {
+            try {
+                const response = await fetch('/api/config');
+                const config = await response.json();
+                
+                if (!config.siteKey) {
+                    throw new Error("Missing public site configuration.");
+                }
+
+                // Explicitly render Turnstile configuration safely
+                turnstile.render('#my-turnstile-widget', {
+                    sitekey: config.siteKey,
+                    callback: function(token) {
+                        userToken = token;
+                        submitBtn.disabled = false;
+                        displayMessage("✓ Challenge passed. Ready to proceed.", "#198754");
+                    },
+                    'expired-callback': function() {
+                        userToken = "";
+                        submitBtn.disabled = true;
+                        displayMessage("❌ Verification expired. Please click again.", "#f57c00");
+                    },
+                    'error-callback': function() {
+                        userToken = "";
+                        submitBtn.disabled = true;
+                        displayMessage("❌ Challenge failed. Refresh and try again.", "#dc3545");
+                    }
+                });
+            } catch (err) {
+                displayMessage("Configuration failure. Security system offline.", "#dc3545");
+            }
+        }
+
+        // Wait for Turnstile runtime engine to be ready
+        window.turnstile = window.turnstile || {};
+        turnstile.ready = initTurnstile;
+
+        // Secure AJAX form handler
+        document.getElementById('verificationForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!userToken) return;
+
+            submitBtn.disabled = true;
+            displayMessage("Authenticating token with server...", "#0d6efd");
+
+            try {
+                const response = await fetch('/api/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token: userToken })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    displayMessage("🎉 Gateway Cleared! Access Granted.", "#198754");
+                } else {
+                    displayMessage("❌ Access Denied: " + (data.error || "Verification failed"), "#dc3545");
+                    if (typeof turnstile !== 'undefined') turnstile.reset();
+                    submitBtn.disabled = true;
+                }
+            } catch (err) {
+                displayMessage("❌ Communication failure or rate-limit tripped.", "#dc3545");
+            }
+        });
+    </script>
+</body>
+</html>

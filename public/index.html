@@ -3,17 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Cloudflare Turnstile Demo</title>
+    <title>Quick check</title>
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"></script>
     <style>
       :root {
-        --bg-color: #f8f9fa;
+        --bg-color: #f5f6f7;
         --card-bg: #ffffff;
-        --text-main: #212529;
-        --text-muted: #6c757d;
-        --border-color: #dee2e6;
-        --primary: #0d6efd;
-        --primary-hover: #0b5ed7;
+        --text-main: #202124;
+        --text-muted: #5f6368;
+        --border-color: #dadce0;
+        --primary: #315c4c;
+        --primary-hover: #264a3d;
       }
 
       body {
@@ -28,31 +28,31 @@
       }
 
       .card {
-        width: min(100%, 420px);
+        width: min(100%, 390px);
         background: var(--card-bg);
         border: 1px solid var(--border-color);
-        border-radius: 12px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
-        padding: 2.5rem;
+        border-radius: 8px;
+        padding: 2rem;
         text-align: center;
         box-sizing: border-box;
       }
 
       h1 {
-        font-size: 1.5rem;
-        margin: 0 0 0.5rem;
+        font-size: 1.35rem;
+        font-weight: 600;
+        margin: 0 0 0.65rem;
       }
 
       p {
         color: var(--text-muted);
-        margin: 0 0 2rem;
+        margin: 0 0 1.5rem;
         line-height: 1.5;
       }
 
       .turnstile-container {
         display: flex;
         justify-content: center;
-        margin-bottom: 1.5rem;
+        margin-bottom: 1.25rem;
         min-height: 65px;
       }
 
@@ -60,11 +60,11 @@
         width: 100%;
         padding: 0.85rem 1rem;
         border: none;
-        border-radius: 6px;
+        border-radius: 5px;
         background: var(--primary);
         color: white;
         font-size: 0.95rem;
-        font-weight: 600;
+        font-weight: 500;
         cursor: pointer;
         transition: background-color 0.15s ease;
       }
@@ -84,19 +84,28 @@
         font-size: 0.85rem;
         font-weight: 600;
       }
+
+      #protected-content {
+        display: none;
+        margin-top: 1.5rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--border-color);
+        color: var(--text-main);
+        line-height: 1.5;
+      }
     </style>
   </head>
   <body>
     <div class="card">
-      <h1>Security Check</h1>
-      <p>Please complete the verification below to continue.</p>
+      <h1>Just a quick check</h1>
+      <p>Please confirm you are a person before continuing.</p>
 
       <form id="verificationForm">
         <div class="turnstile-container">
           <div id="my-turnstile-widget"></div>
         </div>
 
-        <button type="submit" id="submitBtn" disabled>Verify & Continue</button>
+        <button type="submit" id="submitBtn" disabled>Continue</button>
       </form>
 
       <div id="status-message" role="alert"></div>
@@ -130,21 +139,21 @@
             callback: function (token) {
               userToken = token;
               submitBtn.disabled = false;
-              displayMessage('✓ Challenge passed. Ready to proceed.', '#198754');
+              displayMessage('Thanks. Click continue when ready.', '#315c4c');
             },
             'expired-callback': function () {
               userToken = '';
               submitBtn.disabled = true;
-              displayMessage('❌ Verification expired. Please click again.', '#f57c00');
+              displayMessage('The check expired. Please try again.', '#a15c00');
             },
             'error-callback': function () {
               userToken = '';
               submitBtn.disabled = true;
-              displayMessage('❌ Challenge failed. Refresh and try again.', '#dc3545');
+              displayMessage('The check could not be completed. Please try again.', '#a33a3a');
             }
           });
         } catch (error) {
-          displayMessage('Configuration failure. Security system offline.', '#dc3545');
+          displayMessage('The check is temporarily unavailable.', '#a33a3a');
         }
       }
 
@@ -154,7 +163,7 @@
             initTurnstile();
           });
         } else {
-          displayMessage('Turnstile script did not load. Please refresh the page.', '#dc3545');
+          displayMessage('The check did not load. Please refresh the page.', '#a33a3a');
         }
       });
 
@@ -166,7 +175,7 @@
         }
 
         submitBtn.disabled = true;
-        displayMessage('Authenticating token with server...', '#0d6efd');
+        displayMessage('Checking...', '#315c4c');
 
         try {
           const response = await fetch('/api/verify', {
@@ -178,17 +187,17 @@
           const data = await response.json();
 
           if (data.success) {
-            displayMessage('🎉 Gateway cleared! Access granted.', '#198754');
+            window.location.replace('/verified.html');
             return;
           }
 
-          displayMessage('❌ Access denied: ' + (data.error || 'Verification failed'), '#dc3545');
+          displayMessage(data.error || 'The check could not be completed.', '#a33a3a');
           if (window.turnstile) {
             window.turnstile.reset();
           }
           submitBtn.disabled = true;
         } catch (error) {
-          displayMessage('❌ Communication failure or rate-limit tripped.', '#dc3545');
+          displayMessage('Something went wrong. Please try again.', '#a33a3a');
         }
       });
     </script>
